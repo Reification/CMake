@@ -52,20 +52,26 @@ public:
     if (strcmp(p, "ARM") == 0) {
       return new cmGlobalVisualStudio15Generator(cm, genName, "ARM");
     }
+    if ( strcmp( p, "ARM64" ) == 0 )
+    {
+      return new cmGlobalVisualStudio15Generator( cm, genName, "ARM64" );
+    }
     return 0;
   }
 
   virtual void GetDocumentation(cmDocumentationEntry& entry) const
   {
     entry.Name = std::string(vs15generatorName) + " [arch]";
+
     entry.Brief = "Generates Visual Studio 2017 project files.  "
-                  "Optional [arch] can be \"Win64\" or \"ARM\".";
+                  "Optional [arch] can be \"Win64\", \"ARM\", or \"ARM64\".";
   }
 
   virtual void GetGenerators(std::vector<std::string>& names) const
   {
     names.push_back(vs15generatorName);
     names.push_back(vs15generatorName + std::string(" ARM"));
+    names.push_back(vs15generatorName + std::string(" ARM64"));
     names.push_back(vs15generatorName + std::string(" Win64"));
   }
 
@@ -88,6 +94,7 @@ cmGlobalVisualStudio15Generator::cmGlobalVisualStudio15Generator(
   this->DefaultCSharpFlagTable = cmVS141CSharpFlagTable;
   this->DefaultLinkFlagTable = cmVS141LinkFlagTable;
   this->Version = VS15;
+  this->SystemIsAndroidMSVS = false;
 }
 
 bool cmGlobalVisualStudio15Generator::MatchesGeneratorName(
@@ -168,6 +175,120 @@ bool cmGlobalVisualStudio15Generator::InitializeWindows(cmMakefile* mf)
   // Otherwise we must choose a Win 10 SDK even if we are not targeting
   // Windows 10.
   return this->SelectWindows10SDK(mf, false);
+}
+
+bool cmGlobalVisualStudio15Generator::SetGeneratorPlatform( std::string const& p, cmMakefile* mf )
+{
+  if ( this->IsAndroidMSVS() )
+  {
+    if ( p != "ARM64" && p != "ARM" && p != "x86_64" && p != "x86" )
+    {
+      std::string err; 
+      err = std::string("Building for Android with '") + this->GetName() + 
+        "' Platform '" + p + "' not supported. Only ARM, ARM64, x86, x86_64";
+      mf->IssueMessage( cmake::FATAL_ERROR, err.c_str() );
+      return false;
+    }
+  }
+
+  return cmGlobalVisualStudio14Generator::SetGeneratorPlatform( p, mf );
+}
+
+bool cmGlobalVisualStudio15Generator::SetGeneratorToolset( std::string const& ts, cmMakefile* mf )
+{
+  if ( this->IsAndroidMSVS() && ts.empty() &&
+       this->DefaultPlatformToolset.empty() )
+  {
+    std::ostringstream e;
+    e << this->GetName() << " MSVS Android requires CMAKE_GENERATOR_TOOLSET to be set.";
+    mf->IssueMessage( cmake::FATAL_ERROR, e.str() );
+    return false;
+  }
+
+  return cmGlobalVisualStudio14Generator::SetGeneratorToolset( ts, mf );
+}
+
+bool cmGlobalVisualStudio15Generator::FindVCTargetsPath( cmMakefile* mf )
+{
+  static std::string s_targetsPath;
+
+  if ( s_targetsPath.empty() )
+  {
+    this->GetVSInstance( s_targetsPath );
+    s_targetsPath += "/Common7/IDE/VC/VCTargets";
+
+    if ( !cmSystemTools::FileIsDirectory( s_targetsPath ) )
+    {
+      s_targetsPath = "#";
+    }
+  }
+
+  if ( s_targetsPath[0] == '#' )
+  {
+    return false;
+  }
+
+  if ( this->VCTargetsPath.empty() )
+  {
+    this->VCTargetsPath = s_targetsPath;
+  }
+
+  return true;
+}
+
+bool cmGlobalVisualStudio15Generator::InitializeSystem( cmMakefile* mf )
+{
+  if ( strcmp( this->SystemName.c_str(), "Android" ) != 0 )
+  {
+    this->SystemIsAndroidMSVS = false;
+    return cmGlobalVisualStudio14Generator::InitializeSystem( mf );
+  }
+
+  this->SystemIsAndroidMSVS = true;
+
+  if ( !IsAndroidWorkflowInstalled() )
+  {
+    mf->IssueMessage( cmake::FATAL_ERROR,
+                      std::string("CMAKE_SYSTEM_NAME is '") + this->SystemName + "' but "
+                      "'Visual C++ for Cross Platform Mobile Development (Android)' is not installed." );
+    return false;
+  }
+
+  if ( this->DefaultPlatformName != "Win32" )
+  {
+    std::ostringstream e;
+    e << "CMAKE_SYSTEM_NAME is '" << this->SystemName << "' but CMAKE_GENERATOR "
+      << "specifies a platform too: '" << this->GetName() << "'";
+    mf->IssueMessage( cmake::FATAL_ERROR, e.str() );
+    return false;
+  }
+
+  // even though not targeting windows 10 sdk need a valid one for utility vcxproj files
+  if ( !this->SelectWindows10SDK( mf, false ) )
+  {
+    return false;
+  }
+
+  this->DefaultPlatformToolset = "Clang_5_0";
+
+  return true;
+}
+
+bool cmGlobalVisualStudio15Generator::IsAndroidWorkflowInstalled() const
+{
+  std::string vsInstance;
+  if ( !this->GetVSInstance( vsInstance ) )
+  {
+    return false;
+  }
+
+  std::string testPath = vsInstance + "/Common7/IDE/ProjectTemplates/VC/Cross Platform/Android";
+  if ( cmSystemTools::FileIsDirectory( testPath ) )
+  {
+    return true;
+  }
+
+  return false;
 }
 
 bool cmGlobalVisualStudio15Generator::SelectWindowsStoreToolset(
