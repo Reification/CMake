@@ -169,6 +169,8 @@ private:
     const std::map<std::string, std::string>& tags);
   void GetCSharpSourceLink(cmSourceFile const* sf, std::string& link);
 
+  void WriteAndroidMSVSConfigurationValues( std::string const& config );
+
 private:
   typedef cmVisualStudioGeneratorOptions Options;
   typedef std::map<std::string, std::unique_ptr<Options>> OptionsMap;
@@ -200,6 +202,8 @@ private:
   bool NsightTegra;
   int NsightTegraVersion[4];
   bool TargetCompileAsWinRT;
+  bool IsAndroidMSVS;
+
   cmGlobalVisualStudio10Generator* GlobalGenerator;
   cmGeneratedFileStream* BuildFileStream;
   cmLocalVisualStudio7Generator* LocalGenerator;

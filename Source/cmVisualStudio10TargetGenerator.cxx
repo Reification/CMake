@@ -101,7 +101,8 @@ cmVisualStudio10TargetGenerator::cmVisualStudio10TargetGenerator(
   sscanf(gg->GetNsightTegraVersion().c_str(), "%u.%u.%u.%u",
          &this->NsightTegraVersion[0], &this->NsightTegraVersion[1],
          &this->NsightTegraVersion[2], &this->NsightTegraVersion[3]);
-  this->MSTools = !this->NsightTegra;
+  this->IsAndroidMSVS = gg->IsAndroidMSVS();
+  this->MSTools = !this->NsightTegra && !this->IsAndroidMSVS;
   this->Managed = false;
   this->TargetCompileAsWinRT = false;
   this->BuildFileStream = 0;
@@ -300,6 +301,10 @@ void cmVisualStudio10TargetGenerator::Generate()
       this->GeneratorTarget->GetType() <= cmStateEnums::GLOBAL_TARGET) {
     this->WriteApplicationTypeSettings();
     this->VerifyNecessaryFiles();
+  }
+  else if ( this->IsAndroidMSVS )
+  {
+    this->WriteApplicationTypeSettings();
   }
 
   const char* vsProjectTypes =
@@ -985,9 +990,44 @@ void cmVisualStudio10TargetGenerator::WriteProjectConfigurationValues()
       }
     } else if (this->NsightTegra) {
       this->WriteNsightTegraConfigurationValues(*i);
+    } else if ( this->IsAndroidMSVS ) {
+      this->WriteAndroidMSVSConfigurationValues(*i);
     }
 
     this->WriteString("</PropertyGroup>\n", 1);
+  }
+}
+
+void cmVisualStudio10TargetGenerator::WriteAndroidMSVSConfigurationValues( std::string const& config )
+{
+  cmStateEnums::TargetType ttype = this->GeneratorTarget->GetType();
+
+  cmGlobalVisualStudio10Generator* gg =
+    static_cast<cmGlobalVisualStudio10Generator*>(this->GlobalGenerator);
+
+  if ( const char* toolset = gg->GetPlatformToolset() )
+  {
+    std::string pts = "<PlatformToolset>";
+    pts += cmVS10EscapeXML( toolset );
+    pts += "</PlatformToolset>\n";
+    this->WriteString( pts.c_str(), 2 );
+  }
+
+  {
+    std::string apiLevel = 
+      std::string( "<AndroidAPILevel>android-" ) +
+        this->GlobalGenerator->GetSystemVersion() +
+        "</AndroidAPILevel>\n";
+    this->WriteString( apiLevel.c_str(), 2 );
+  }
+
+  if ( ttype < cmStateEnums::UTILITY )
+  {
+    if ( const char* stlType = this->GeneratorTarget->Target->GetMakefile()->GetDefinition( "ANDROID_STL" ) )
+    {
+      std::string useOfStl = std::string( "<UseOfStl>" ) + stlType + "</UseOfStl>\n";
+      this->WriteString( useOfStl.c_str(), 2 );
+    }
   }
 }
 
@@ -3989,6 +4029,15 @@ void cmVisualStudio10TargetGenerator::WriteApplicationTypeSettings()
       }
     }
   }
+  else if ( this->IsAndroidMSVS ) {
+    this->WriteString( "<ApplicationType>Android</ApplicationType>\n", 2 );
+    this->WriteString( "<ApplicationTypeRevision>3.0</ApplicationTypeRevision>\n", 2 );
+    this->WriteString( "<MinimumVisualStudioVersion>15.0</MinimumVisualStudioVersion>\n", 2 );
+    // nothing below pertains to android config.
+    // return early to minimize diffs for merging.
+    return;
+  }
+
   if (isAppContainer) {
     this->WriteString("<AppContainerApplication>true"
                       "</AppContainerApplication>\n",
