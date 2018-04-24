@@ -48,6 +48,9 @@ Caveats
 
 This fork was created to suit the internal needs of Reification Incorporated and no representation is made as to its suitability for anyone else's.
 
+End of Fork Readme
+------------------
+
 CMake
 *****
 
