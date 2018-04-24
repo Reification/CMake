@@ -34,8 +34,10 @@ Usage
 A toolchain file for MSVS Android projects is provided in <cmake_install_dir>/share/cmake-3.11/msvs-android/android.toolchain.cmake
 See that file and the NDK toolchain file it wraps for more details on configurable variables
 
-To easily use the provided toolchain file create your own android.toolchain.cmake with the line
-include("${CMAKE_ROOT}/msvs-android/android.toolchain.cmake")
+To easily use the provided toolchain file create your own android.toolchain.cmake with the line::
+
+ include("${CMAKE_ROOT}/msvs-android/android.toolchain.cmake")
+
 You can precede the include with any variable configurations specific to your project or just allow them to be set via -D arguments on the command line.
 
 e.g.::
