@@ -197,6 +197,7 @@ private:
   std::string Platform;
   std::string GUID;
   std::string Name;
+  std::string VersionAndroidMSVS;
   bool MSTools;
   bool Managed;
   bool NsightTegra;

@@ -116,6 +116,7 @@ public:
   cmIDEFlagTable const* GetNasmFlagTable() const;
 
   virtual bool IsAndroidMSVS() const { return false; }
+  virtual std::string GetVersionAndroidMSVS() const { return ""; }
 
 protected:
   void Generate() override;

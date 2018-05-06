@@ -102,6 +102,7 @@ cmVisualStudio10TargetGenerator::cmVisualStudio10TargetGenerator(
          &this->NsightTegraVersion[0], &this->NsightTegraVersion[1],
          &this->NsightTegraVersion[2], &this->NsightTegraVersion[3]);
   this->IsAndroidMSVS = gg->IsAndroidMSVS();
+  this->VersionAndroidMSVS = gg->GetVersionAndroidMSVS();
   this->MSTools = !this->NsightTegra && !this->IsAndroidMSVS;
   this->Managed = false;
   this->TargetCompileAsWinRT = false;
@@ -4031,7 +4032,9 @@ void cmVisualStudio10TargetGenerator::WriteApplicationTypeSettings()
   }
   else if ( this->IsAndroidMSVS ) {
     this->WriteString( "<ApplicationType>Android</ApplicationType>\n", 2 );
-    this->WriteString( "<ApplicationTypeRevision>3.0</ApplicationTypeRevision>\n", 2 );
+    this->WriteString( "<ApplicationTypeRevision>", 2 );
+    this->WriteString( this->VersionAndroidMSVS.c_str(), 0 );
+    this->WriteString( "</ApplicationTypeRevision>\n", 0 );
     this->WriteString( "<MinimumVisualStudioVersion>15.0</MinimumVisualStudioVersion>\n", 2 );
     // nothing below pertains to android config.
     // return early to minimize diffs for merging.

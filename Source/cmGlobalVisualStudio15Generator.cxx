@@ -11,6 +11,8 @@
 #include "cmVS141LinkFlagTable.h"
 #include "cmVSSetupHelper.h"
 
+#include "cmsys/Glob.hxx"
+
 static const char vs15generatorName[] = "Visual Studio 15 2017";
 
 // Map generator name without year to name with year.
@@ -244,7 +246,7 @@ bool cmGlobalVisualStudio15Generator::InitializeSystem( cmMakefile* mf )
     return cmGlobalVisualStudio14Generator::InitializeSystem( mf );
   }
 
-  if ( !IsAndroidWorkflowInstalled() )
+  if ( GetInstalledAndroidWorkflow().empty() )
   {
     if ( !GetInstalledNsightTegraVersion().empty() )
     {
@@ -278,21 +280,43 @@ bool cmGlobalVisualStudio15Generator::InitializeSystem( cmMakefile* mf )
   return true;
 }
 
-bool cmGlobalVisualStudio15Generator::IsAndroidWorkflowInstalled() const
+std::string cmGlobalVisualStudio15Generator::GetInstalledAndroidWorkflow() const
 {
+  if ( !VersionAndroidMSVS.empty() ) { return VersionAndroidMSVS; }
+
   std::string vsInstance;
   if ( !this->GetVSInstance( vsInstance ) )
   {
     return false;
   }
 
-  std::string testPath = vsInstance + "/Common7/IDE/ProjectTemplates/VC/Cross Platform/Android";
-  if ( cmSystemTools::FileIsDirectory( testPath ) )
+  std::string testPath = vsInstance + "/Common7/IDE/VC/VCTargets/Application Type/Android";
+
+  if ( !cmSystemTools::FileIsDirectory( testPath ) )
   {
-    return true;
+    return "";
   }
 
-  return false;
+  cmsys::Glob versionDirGlob;
+  versionDirGlob.SetListDirs( true );
+  versionDirGlob.FindFiles( testPath + "/[0-9]*.[0-9]*" );
+  std::string highestInstalled;
+
+  for ( const std::string& versionDir : versionDirGlob.GetFiles() )
+  {
+    if ( cmSystemTools::FileIsDirectory( versionDir ) )
+    {
+      highestInstalled = versionDir;
+    }
+  }
+
+  if ( !highestInstalled.empty() )
+  {
+    const char* versionDirName = strrchr( highestInstalled.c_str(), '/' ) + 1;
+    VersionAndroidMSVS = versionDirName;
+  }
+
+  return VersionAndroidMSVS;
 }
 
 bool cmGlobalVisualStudio15Generator::SelectWindowsStoreToolset(
