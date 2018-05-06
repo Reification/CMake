@@ -115,6 +115,9 @@ public:
   cmIDEFlagTable const* GetMasmFlagTable() const;
   cmIDEFlagTable const* GetNasmFlagTable() const;
 
+  virtual bool IsAndroidMSVS() const { return false; }
+  virtual std::string GetVersionAndroidMSVS() const { return ""; }
+
 protected:
   void Generate() override;
   virtual bool InitializeSystem(cmMakefile* mf);
@@ -155,6 +158,9 @@ protected:
   bool SystemIsWindowsPhone;
   bool SystemIsWindowsStore;
 
+  std::string VCTargetsPath;
+  virtual bool FindVCTargetsPath( cmMakefile* mf );
+
 private:
   class Factory;
   struct LongestSourcePath
@@ -182,9 +188,6 @@ private:
   bool PlatformToolsetNeedsDebugEnum;
 
   bool ParseGeneratorToolset(std::string const& ts, cmMakefile* mf);
-
-  std::string VCTargetsPath;
-  bool FindVCTargetsPath(cmMakefile* mf);
 
   bool CudaEnabled;
 

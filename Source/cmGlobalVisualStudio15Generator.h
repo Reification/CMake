@@ -30,11 +30,22 @@ public:
 
   bool SetGeneratorInstance(std::string const& i, cmMakefile* mf) override;
 
+  bool SetGeneratorPlatform( std::string const& p, cmMakefile* mf ) override;
+
+  bool SetGeneratorToolset( std::string const& ts, cmMakefile* mf ) override;
+
+  bool IsAndroidMSVS() const override { return SystemIsAndroidMSVS; }
+  std::string GetVersionAndroidMSVS() const override { return VersionAndroidMSVS; }
+
   bool GetVSInstance(std::string& dir) const;
 
 protected:
   bool InitializeWindows(cmMakefile* mf) override;
   bool SelectWindowsStoreToolset(std::string& toolset) const override;
+
+  bool InitializeSystem( cmMakefile* mf ) override;
+  bool FindVCTargetsPath( cmMakefile* mf ) override;
+  std::string GetInstalledAndroidWorkflow() const;
 
   const char* GetIDEVersion() override { return "15.0"; }
 
@@ -53,6 +64,8 @@ protected:
   std::string FindDevEnvCommand() override;
 
 private:
+  bool SystemIsAndroidMSVS;
+  mutable std::string VersionAndroidMSVS;
   class Factory;
   mutable cmVSSetupAPIHelper vsSetupAPIHelper;
 };
