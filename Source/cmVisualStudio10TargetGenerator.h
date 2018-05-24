@@ -197,13 +197,11 @@ private:
   std::string Platform;
   std::string GUID;
   std::string Name;
-  std::string VersionAndroidMSVS;
   bool MSTools;
   bool Managed;
   bool NsightTegra;
   int NsightTegraVersion[4];
   bool TargetCompileAsWinRT;
-  bool IsAndroidMSVS;
 
   cmGlobalVisualStudio10Generator* GlobalGenerator;
   cmGeneratedFileStream* BuildFileStream;

@@ -36,6 +36,7 @@ public:
 
   bool IsAndroidMSVS() const override { return SystemIsAndroidMSVS; }
   std::string GetVersionAndroidMSVS() const override { return VersionAndroidMSVS; }
+  std::string GetAndroidAPILevel() const override;
 
   bool GetVSInstance(std::string& dir) const;
 
@@ -45,7 +46,12 @@ protected:
 
   bool InitializeSystem( cmMakefile* mf ) override;
   bool FindVCTargetsPath( cmMakefile* mf ) override;
+
+  bool InitializeAndroidWorkflow(cmMakefile* mf);
+
   std::string GetInstalledAndroidWorkflow() const;
+
+  std::string GetDefaultAndroidToolChain() const;
 
   const char* GetIDEVersion() override { return "15.0"; }
 
@@ -68,5 +74,7 @@ private:
   mutable std::string VersionAndroidMSVS;
   class Factory;
   mutable cmVSSetupAPIHelper vsSetupAPIHelper;
+  std::string AndroidAPILevel;
+  std::string DefaultAndroidToolChain;
 };
 #endif

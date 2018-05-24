@@ -2,18 +2,16 @@
 #specify this file directly as toolchain file or include from your project's toolchain file
 
 #for android.toolchain.cmake innards
-if("${ANDROID_NDK}" STREQUAL "")
-  if(NOT "$ENV{ANDROID_NDK_HOME}" STREQUAL "")
-    set(ANDROID_NDK "$ENV{ANDROID_NDK_HOME}")
-  elseif(NOT "$ENV{NDK_ROOT}" STREQUAL "")
-    set(ANDROID_NDK "$ENV{NDK_ROOT}")
-  else()
-    message(FATAL_ERROR "ANDROID_NDK cmake variable, ANDROID_NDK_HOME environment variable, or NDK_ROOT environment variable must be set.")
-  endif()
+if(NOT "$ENV{ANDROID_NDK_HOME}" STREQUAL "")
+  set(_ANDROID_NDK "$ENV{ANDROID_NDK_HOME}")
+elseif(NOT "$ENV{NDK_ROOT}" STREQUAL "")
+  set(_ANDROID_NDK "$ENV{NDK_ROOT}")
+else()
+  message(FATAL_ERROR "environment variable ANDROID_NDK_HOME or NDK_ROOT must be set.")
 endif()
 
-if(NOT EXISTS "${ANDROID_NDK}/")
-  message(FATAL_ERROR "ANDROID_NDK directory '${ANDROID_NDK}/' does not exist")
+if(NOT EXISTS "${_ANDROID_NDK}/")
+  message(FATAL_ERROR "'${_ANDROID_NDK}' does not exist")
 endif()
 
 if("${ANDROID_ABI}" STREQUAL "")
@@ -33,7 +31,9 @@ if("${ANDROID_TOOLCHAIN}" STREQUAL "")
 endif()
 
 #NDK toolchain file does the heavy lifting
-include("${ANDROID_NDK}/build/cmake/android.toolchain.cmake")
+include("${_ANDROID_NDK}/build/cmake/android.toolchain.cmake")
+
+unset(_ANDROID_NDK)
 
 #default is executable - can't build native console executable under NDK, so use STATIC_LIBRARY (only other valid option)
 set(CMAKE_TRY_COMPILE_TARGET_TYPE STATIC_LIBRARY)
@@ -46,13 +46,13 @@ if ("${CMAKE_GENERATOR}" MATCHES "Visual Studio")
   #utility value for testing if building for android under visual studio mobile workflow
   set(VS_ANDROID true) 
 
-  #Toolchain specification for MSVS is with these strings
-  if(${ANDROID_TOOLCHAIN} STREQUAL "clang")
-    set(CMAKE_GENERATOR_TOOLSET "Clang_5_0")
-  elseif(${ANDROID_TOOLCHAIN} STREQUAL "gcc")
-    set(CMAKE_GENERATOR_TOOLSET "GCC_4_9")
-  else()
-    message(FATAL "ANDROID_TOOLCHAIN must be clang or gcc")
+  #cmake will pick most recent supported clang toolchain by default.
+  #for gcc, specify the last version that will ever be supported on android.
+  #seriously, who's using this any more?
+  if(${ANDROID_TOOLCHAIN} STREQUAL "gcc")
+    if(NOT CMAKE_GENERATOR_TOOLSET)
+      set(CMAKE_GENERATOR_TOOLSET "GCC_4_9")
+    endif()
   endif()
 
   #Platform specification for MSVS is with these strings
