@@ -101,9 +101,7 @@ cmVisualStudio10TargetGenerator::cmVisualStudio10TargetGenerator(
   sscanf(gg->GetNsightTegraVersion().c_str(), "%u.%u.%u.%u",
          &this->NsightTegraVersion[0], &this->NsightTegraVersion[1],
          &this->NsightTegraVersion[2], &this->NsightTegraVersion[3]);
-  this->IsAndroidMSVS = gg->IsAndroidMSVS();
-  this->VersionAndroidMSVS = gg->GetVersionAndroidMSVS();
-  this->MSTools = !this->NsightTegra && !this->IsAndroidMSVS;
+  this->MSTools = !this->NsightTegra && !gg->IsAndroidMSVS();
   this->Managed = false;
   this->TargetCompileAsWinRT = false;
   this->BuildFileStream = 0;
@@ -303,7 +301,7 @@ void cmVisualStudio10TargetGenerator::Generate()
     this->WriteApplicationTypeSettings();
     this->VerifyNecessaryFiles();
   }
-  else if ( this->IsAndroidMSVS )
+  else if ( this->GlobalGenerator->IsAndroidMSVS() )
   {
     this->WriteApplicationTypeSettings();
   }
@@ -991,7 +989,7 @@ void cmVisualStudio10TargetGenerator::WriteProjectConfigurationValues()
       }
     } else if (this->NsightTegra) {
       this->WriteNsightTegraConfigurationValues(*i);
-    } else if ( this->IsAndroidMSVS ) {
+    } else if ( this->GlobalGenerator->IsAndroidMSVS() ) {
       this->WriteAndroidMSVSConfigurationValues(*i);
     }
 
@@ -1017,7 +1015,7 @@ void cmVisualStudio10TargetGenerator::WriteAndroidMSVSConfigurationValues( std::
   {
     std::string apiLevel = 
       std::string( "<AndroidAPILevel>android-" ) +
-        this->GlobalGenerator->GetSystemVersion() +
+        this->GlobalGenerator->GetAndroidAPILevel() +
         "</AndroidAPILevel>\n";
     this->WriteString( apiLevel.c_str(), 2 );
   }
@@ -4030,10 +4028,10 @@ void cmVisualStudio10TargetGenerator::WriteApplicationTypeSettings()
       }
     }
   }
-  else if ( this->IsAndroidMSVS ) {
+  else if ( this->GlobalGenerator->IsAndroidMSVS() ) {
     this->WriteString( "<ApplicationType>Android</ApplicationType>\n", 2 );
     this->WriteString( "<ApplicationTypeRevision>", 2 );
-    this->WriteString( this->VersionAndroidMSVS.c_str(), 0 );
+    this->WriteString( this->GlobalGenerator->GetVersionAndroidMSVS().c_str(), 0 );
     this->WriteString( "</ApplicationTypeRevision>\n", 0 );
     this->WriteString( "<MinimumVisualStudioVersion>15.0</MinimumVisualStudioVersion>\n", 2 );
     // nothing below pertains to android config.

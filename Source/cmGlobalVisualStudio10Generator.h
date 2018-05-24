@@ -117,6 +117,7 @@ public:
 
   virtual bool IsAndroidMSVS() const { return false; }
   virtual std::string GetVersionAndroidMSVS() const { return ""; }
+  virtual std::string GetAndroidAPILevel() const { return ""; }
 
 protected:
   void Generate() override;
