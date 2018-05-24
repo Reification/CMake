@@ -830,7 +830,7 @@ void CMakeSetupDialog::doDeleteCache()
 void CMakeSetupDialog::doAbout()
 {
   QString msg = tr(
-    "CMake %1 (cmake.org)[Reification Fork].\n"
+    "CMake %1 (cmake.org)[Reification Fork v2].\n"
     "Canonical CMake suite maintained and supported by Kitware (kitware.com/cmake).\n"
     "Fork maintained for internal use at (github.com/Reification/CMake.git)."
     "\n"
