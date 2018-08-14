@@ -830,9 +830,9 @@ void CMakeSetupDialog::doDeleteCache()
 void CMakeSetupDialog::doAbout()
 {
   QString msg = tr(
-    "CMake %1 (cmake.org).\n"
-    "CMake suite maintained and supported by Kitware (kitware.com/cmake).\n"
-    "Distributed under terms of the BSD 3-Clause License.\n"
+    "CMake %1 (cmake.org)[Reification Fork v2].\n"
+    "Canonical CMake suite maintained and supported by Kitware (kitware.com/cmake).\n"
+    "Fork maintained for internal use at (github.com/Reification/CMake.git)."
     "\n"
     "CMake GUI maintained by csimsoft,\n"
     "built using Qt %2 (qt-project.org).\n"
