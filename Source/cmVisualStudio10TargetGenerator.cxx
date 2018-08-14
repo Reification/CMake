@@ -1097,28 +1097,15 @@ void cmVisualStudio10TargetGenerator::WriteAndroidMSVSConfigurationValues(Elem& 
 
   if ( const char* toolset = gg->GetPlatformToolset() )
   {
-    //std::string pts = "<PlatformToolset>";
-    //pts += cmVS10EscapeXML( toolset );
-    //pts += "</PlatformToolset>\n";
-    //this->WriteString( pts.c_str(), 2 );
     e1.Element("PlatformToolset", cmVS10EscapeXML(toolset));
   }
 
-  {
-    //std::string apiLevel = 
-    //  std::string( "<AndroidAPILevel>android-" ) +
-    //    this->GlobalGenerator->GetAndroidAPILevel() +
-    //    "</AndroidAPILevel>\n";
-    //this->WriteString( apiLevel.c_str(), 2 );
-    e1.Element("AndroidAPILevel", "android-" + this->GlobalGenerator->GetAndroidAPILevel());
-  }
+  e1.Element("AndroidAPILevel", "android-" + this->GlobalGenerator->GetAndroidAPILevel());
 
   if ( ttype < cmStateEnums::UTILITY )
   {
     if ( const char* stlType = this->GeneratorTarget->Target->GetMakefile()->GetDefinition( "ANDROID_STL" ) )
     {
-      //std::string useOfStl = std::string( "<UseOfStl>" ) + stlType + "</UseOfStl>\n";
-      //this->WriteString( useOfStl.c_str(), 2 );
       e1.Element("UseOfStl", stlType);
     }
   }
@@ -4031,16 +4018,9 @@ void cmVisualStudio10TargetGenerator::WriteApplicationTypeSettings(Elem& e1)
     }
   }
   else if ( this->GlobalGenerator->IsAndroidMSVS() ) {
-    //this->WriteString("<ApplicationType>Android</ApplicationType>\n", 2);
     e1.Element("ApplicationType", "Android");
-
-    //this->WriteString( "<ApplicationTypeRevision>", 2 );
-    //this->WriteString( this->GlobalGenerator->GetVersionAndroidMSVS().c_str(), 0 );
-    //this->WriteString( "</ApplicationTypeRevision>\n", 0 );
     e1.Element("ApplicationTypeRevision",
                this->GlobalGenerator->GetVersionAndroidMSVS());
-
-    //this->WriteString( "<MinimumVisualStudioVersion>15.0</MinimumVisualStudioVersion>\n", 2 );
     e1.Element("MinimumVisualStudioVersion", "15.0");
 
     // nothing below pertains to android config.
