@@ -6,4 +6,7 @@
 *.pyc
 Testing
 
+# Visual Studio work directory
+.vs/
+
 build/
