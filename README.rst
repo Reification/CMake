@@ -10,12 +10,12 @@ Supported Android Build Configs
 
 * Static libraries
 * Shared libraries
+* Packaging projects (via .androidproj template)
 
 Not Supported
 =============
 
 * Java projects
-* Package projects
 * Command-line executables
 
 Prereqs
@@ -31,7 +31,7 @@ Prereqs
 Usage
 =====
 
-A toolchain file for MSVS Android projects is provided in <cmake_install_dir>/share/cmake-3.11/msvs-android/android.toolchain.cmake
+A toolchain file for MSVS Android projects is provided in <cmake_install_dir>/share/cmake-3.12/msvs-android/android.toolchain.cmake
 See that file and the NDK toolchain file it wraps for more details on configurable variables
 
 To easily use the provided toolchain file create your own android.toolchain.cmake with the line::
@@ -44,6 +44,9 @@ e.g.::
 
 $ cmake -G "Visual Studio 15 2017" -DCMAKE_TOOLCHAIN_FILE=PathToMyProjectSource/android.toolchain.cmake PathToMyProjectSource
 
+For example see https://github.com/Reification/CMake/releases/download/v3.11.1-reification.2/ReificationAndroidSample.zip
+
+A sample android project template for use with config can be found at <cmake_install_dir>/share/cmake-3.12/msvs-android/Template.androidproj.in
 
 Caveats
 =======
