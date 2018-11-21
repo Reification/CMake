@@ -65,9 +65,10 @@ bool cmDocumentation::PrintVersion(std::ostream& os)
   /* clang-format off */
   os <<
     this->GetNameString() <<
-    " version " << cmVersion::GetCMakeVersion() << "\n"
+    " version " << cmVersion::GetCMakeVersion() << " [Reification Fork v2]" << "\n"
     "\n"
-    "CMake suite maintained and supported by Kitware (kitware.com/cmake).\n"
+    "Canonical CMake suite maintained and supported by Kitware (kitware.com/cmake).\n"
+    "Fork maintained for internal use at (github.com/Reification/CMake.git).\n"
     ;
   /* clang-format on */
   return true;

@@ -74,6 +74,19 @@ bool cmIncludeExternalMSProjectCommand::InitialPass(
     std::string path = args[1];
     cmSystemTools::ConvertToUnixSlashes(path);
 
+    // handle android project type guid automatically
+    if ( customType.empty() )
+    {
+      constexpr char androidProjSFX[] = ".androidproj";
+      constexpr size_t androidprojLen = sizeof( androidProjSFX ) - 1;
+
+      if ( path.length() > androidprojLen && !strcmp( path.c_str() + path.length() - androidprojLen, androidProjSFX ) )
+      {
+        // magic type guid for .androidproj files when referenced in a solution file
+        customType = "39E2626F-3545-4960-A6E8-258AD8476CE5";
+      }
+    }
+
     if (!customGuid.empty()) {
       std::string guidVariable = utility_name + "_GUID_CMAKE";
       this->Makefile->GetCMakeInstance()->AddCacheEntry(

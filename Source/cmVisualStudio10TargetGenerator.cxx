@@ -244,7 +244,7 @@ cmVisualStudio10TargetGenerator::cmVisualStudio10TargetGenerator(
   sscanf(gg->GetNsightTegraVersion().c_str(), "%u.%u.%u.%u",
          &this->NsightTegraVersion[0], &this->NsightTegraVersion[1],
          &this->NsightTegraVersion[2], &this->NsightTegraVersion[3]);
-  this->MSTools = !this->NsightTegra;
+  this->MSTools = !this->NsightTegra && !gg->IsAndroidMSVS();
   this->Managed = false;
   this->TargetCompileAsWinRT = false;
   this->IsMissingFiles = false;
@@ -427,6 +427,10 @@ void cmVisualStudio10TargetGenerator::Generate()
         this->WriteApplicationTypeSettings(e1);
         this->VerifyNecessaryFiles();
       }
+  else if ( this->GlobalGenerator->IsAndroidMSVS() )
+  {
+    this->WriteApplicationTypeSettings(e0);
+  }
 
       const char* vsProjectTypes =
         this->GeneratorTarget->GetProperty("VS_GLOBAL_PROJECT_TYPES");
@@ -1077,6 +1081,31 @@ void cmVisualStudio10TargetGenerator::WriteProjectConfigurationValues(Elem& e0)
       }
     } else if (this->NsightTegra) {
       this->WriteNsightTegraConfigurationValues(e1, c);
+    } else if ( this->GlobalGenerator->IsAndroidMSVS() ) {
+      this->WriteAndroidMSVSConfigurationValues(e1, c);
+    }
+  }
+}
+
+void cmVisualStudio10TargetGenerator::WriteAndroidMSVSConfigurationValues(Elem& e1, std::string const& config)
+{
+  cmStateEnums::TargetType ttype = this->GeneratorTarget->GetType();
+
+  cmGlobalVisualStudio10Generator* gg =
+    static_cast<cmGlobalVisualStudio10Generator*>(this->GlobalGenerator);
+
+  if ( const char* toolset = gg->GetPlatformToolset() )
+  {
+    e1.Element("PlatformToolset", cmVS10EscapeXML(toolset));
+  }
+
+  e1.Element("AndroidAPILevel", "android-" + this->GlobalGenerator->GetAndroidAPILevel());
+
+  if ( ttype < cmStateEnums::UTILITY )
+  {
+    if ( const char* stlType = this->GeneratorTarget->Target->GetMakefile()->GetDefinition( "ANDROID_STL" ) )
+    {
+      e1.Element("UseOfStl", stlType);
     }
   }
 }
@@ -4068,6 +4097,17 @@ void cmVisualStudio10TargetGenerator::WriteApplicationTypeSettings(Elem& e1)
       }
     }
   }
+  else if ( this->GlobalGenerator->IsAndroidMSVS() ) {
+    e1.Element("ApplicationType", "Android");
+    e1.Element("ApplicationTypeRevision",
+               this->GlobalGenerator->GetVersionAndroidMSVS());
+    e1.Element("MinimumVisualStudioVersion", "15.0");
+
+    // nothing below pertains to android config.
+    // return early to minimize diffs for merging.
+    return;
+  }
+
   if (isAppContainer) {
     e1.Element("AppContainerApplication", "true");
   } else if (this->Platform == "ARM64") {

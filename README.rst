@@ -1,3 +1,61 @@
+Reification Fork of CMake
+*************************
+
+This fork adds support for MSVS 2017's Mobile C++ for Android workflow.
+
+CMake's original README below this section.
+
+Supported Android Build Configs
+===============================
+
+* Static libraries
+* Shared libraries
+* Packaging projects (via .androidproj template)
+
+Not Supported
+=============
+
+* Java projects
+* Command-line executables
+
+Prereqs
+=======
+
+* Microsoft Visual Studio 2017 with Mobile C++ for Android worflow
+* Android SDK
+* Android NDK
+* ANDROID_NDK_HOME or NDK_ROOT environment variable must be set to installed location of NDK
+* Apache Ant
+* JDK1.8
+
+Usage
+=====
+
+A toolchain file for MSVS Android projects is provided in <cmake_install_dir>/share/cmake-3.12/msvs-android/android.toolchain.cmake
+See that file and the NDK toolchain file it wraps for more details on configurable variables
+
+To easily use the provided toolchain file create your own android.toolchain.cmake with the line::
+
+ include("${CMAKE_ROOT}/msvs-android/android.toolchain.cmake")
+
+You can precede the include with any variable configurations specific to your project or just allow them to be set via -D arguments on the command line.
+
+e.g.::
+
+$ cmake -G "Visual Studio 15 2017" -DCMAKE_TOOLCHAIN_FILE=PathToMyProjectSource/android.toolchain.cmake PathToMyProjectSource
+
+For example see https://github.com/Reification/CMake/releases/download/v3.11.1-reification.2/ReificationAndroidSample.zip
+
+A sample android project template for use with config can be found at <cmake_install_dir>/share/cmake-3.12/msvs-android/Template.androidproj.in
+
+Caveats
+=======
+
+This fork was created to suit the internal needs of Reification Incorporated and no representation is made as to its suitability for anyone else's.
+
+End of Fork Readme
+------------------
+
 CMake
 *****
 

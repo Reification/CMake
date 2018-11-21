@@ -153,7 +153,8 @@ bool cmGlobalVisualStudio14Generator::SelectWindows10SDK(cmMakefile* mf,
     return false;
   }
   if (!cmSystemTools::VersionCompareEqual(this->WindowsTargetPlatformVersion,
-                                          this->SystemVersion)) {
+                                          this->SystemVersion) && !this->IsAndroidMSVS()) 
+  {
     std::ostringstream e;
     e << "Selecting Windows SDK version " << this->WindowsTargetPlatformVersion
       << " to target Windows " << this->SystemVersion << ".";

@@ -174,6 +174,8 @@ private:
     Elem& e2, const std::map<std::string, std::string>& tags);
   void GetCSharpSourceLink(cmSourceFile const* sf, std::string& link);
 
+  void WriteAndroidMSVSConfigurationValues( Elem& e1, std::string const& config );
+
 private:
   friend class cmVS10GeneratorOptions;
   typedef cmVS10GeneratorOptions Options;
