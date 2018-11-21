@@ -5,7 +5,6 @@
 #include "cmAffinity.h"
 #include "cmCTest.h"
 #include "cmCTestRunTest.h"
-#include "cmCTestScriptHandler.h"
 #include "cmCTestTestHandler.h"
 #include "cmSystemTools.h"
 #include "cmWorkingDirectory.h"
@@ -15,7 +14,6 @@
 #include "cmUVSignalHackRAII.h" // IWYU pragma: keep
 
 #include "cmsys/FStream.hxx"
-#include "cmsys/String.hxx"
 #include "cmsys/SystemInformation.hxx"
 
 #include <algorithm>
@@ -53,11 +51,11 @@ cmCTestMultiProcessHandler::cmCTestMultiProcessHandler()
 {
   this->ParallelLevel = 1;
   this->TestLoad = 0;
+  this->FakeLoadForTesting = 0;
   this->Completed = 0;
   this->RunningCount = 0;
   this->ProcessorsAvailable = cmAffinity::GetProcessorsAvailable();
   this->HaveAffinity = this->ProcessorsAvailable.size();
-  this->StopTimePassed = false;
   this->HasCycles = false;
   this->SerialTestRunning = false;
 }
@@ -97,6 +95,16 @@ void cmCTestMultiProcessHandler::SetParallelLevel(size_t level)
 void cmCTestMultiProcessHandler::SetTestLoad(unsigned long load)
 {
   this->TestLoad = load;
+
+  std::string fake_load_value;
+  if (cmSystemTools::GetEnv("__CTEST_FAKE_LOAD_AVERAGE_FOR_TESTING",
+                            fake_load_value)) {
+    if (!cmSystemTools::StringToULong(fake_load_value.c_str(),
+                                      &this->FakeLoadForTesting)) {
+      cmSystemTools::Error("Failed to parse fake load value: ",
+                           fake_load_value.c_str());
+    }
+  }
 }
 
 void cmCTestMultiProcessHandler::RunTests()
@@ -121,17 +129,6 @@ void cmCTestMultiProcessHandler::RunTests()
 
 bool cmCTestMultiProcessHandler::StartTestProcess(int test)
 {
-  std::chrono::system_clock::time_point stop_time = this->CTest->GetStopTime();
-  if (stop_time != std::chrono::system_clock::time_point() &&
-      stop_time <= std::chrono::system_clock::now()) {
-    cmCTestLog(this->CTest, ERROR_MESSAGE,
-               "The stop time has been passed. "
-               "Stopping all tests."
-                 << std::endl);
-    this->StopTimePassed = true;
-    return false;
-  }
-
   if (this->HaveAffinity && this->Properties[test]->WantAffinity) {
     size_t needProcessors = this->GetProcessorsUsed(test);
     if (needProcessors > this->ProcessorsAvailable.size()) {
@@ -181,13 +178,37 @@ bool cmCTestMultiProcessHandler::StartTestProcess(int test)
                           this->Properties[test]->Directory + " : " +
                           std::strerror(workdir.GetLastResult()));
   } else {
-    if (testRun->StartTest(this->Total)) {
+    if (testRun->StartTest(this->Completed, this->Total)) {
       return true;
     }
   }
 
   this->FinishTestProcess(testRun, false);
   return false;
+}
+
+bool cmCTestMultiProcessHandler::CheckStopTimePassed()
+{
+  if (!this->StopTimePassed) {
+    std::chrono::system_clock::time_point stop_time =
+      this->CTest->GetStopTime();
+    if (stop_time != std::chrono::system_clock::time_point() &&
+        stop_time <= std::chrono::system_clock::now()) {
+      this->SetStopTimePassed();
+    }
+  }
+  return this->StopTimePassed;
+}
+
+void cmCTestMultiProcessHandler::SetStopTimePassed()
+{
+  if (!this->StopTimePassed) {
+    cmCTestLog(this->CTest, ERROR_MESSAGE,
+               "The stop time has been passed. "
+               "Stopping all tests."
+                 << std::endl);
+    this->StopTimePassed = true;
+  }
 }
 
 void cmCTestMultiProcessHandler::LockResources(int index)
@@ -259,11 +280,22 @@ bool cmCTestMultiProcessHandler::StartTest(int test)
 
 void cmCTestMultiProcessHandler::StartNextTests()
 {
-  size_t numToStart = 0;
+  if (this->TestLoadRetryTimer.get() != nullptr) {
+    // This timer may be waiting to call StartNextTests again.
+    // Since we have been called it is no longer needed.
+    uv_timer_stop(this->TestLoadRetryTimer);
+  }
 
   if (this->Tests.empty()) {
+    this->TestLoadRetryTimer.reset();
     return;
   }
+
+  if (this->CheckStopTimePassed()) {
+    return;
+  }
+
+  size_t numToStart = 0;
 
   if (this->RunningCount < this->ParallelLevel) {
     numToStart = this->ParallelLevel - this->RunningCount;
@@ -280,7 +312,6 @@ void cmCTestMultiProcessHandler::StartNextTests()
   }
 
   bool allTestsFailedTestLoadCheck = false;
-  bool usedFakeLoadForTesting = false;
   size_t minProcessorsRequired = this->ParallelLevel;
   std::string testWithMinProcessors;
 
@@ -293,15 +324,11 @@ void cmCTestMultiProcessHandler::StartNextTests()
     allTestsFailedTestLoadCheck = true;
 
     // Check for a fake load average value used in testing.
-    std::string fake_load_value;
-    if (cmSystemTools::GetEnv("__CTEST_FAKE_LOAD_AVERAGE_FOR_TESTING",
-                              fake_load_value)) {
-      usedFakeLoadForTesting = true;
-      if (!cmSystemTools::StringToULong(fake_load_value.c_str(),
-                                        &systemLoad)) {
-        cmSystemTools::Error("Failed to parse fake load value: ",
-                             fake_load_value.c_str());
-      }
+    if (this->FakeLoadForTesting > 0) {
+      systemLoad = this->FakeLoadForTesting;
+      // Drop the fake load for the next iteration to a value low enough
+      // that the next iteration will start tests.
+      this->FakeLoadForTesting = 1;
     }
     // If it's not set, look up the true load average.
     else {
@@ -347,10 +374,6 @@ void cmCTestMultiProcessHandler::StartNextTests()
     }
 
     if (testLoadOk && processors <= numToStart && this->StartTest(test)) {
-      if (this->StopTimePassed) {
-        return;
-      }
-
       numToStart -= processors;
     } else if (numToStart == 0) {
       break;
@@ -385,16 +408,23 @@ void cmCTestMultiProcessHandler::StartNextTests()
     }
     cmCTestLog(this->CTest, HANDLER_OUTPUT, "*****" << std::endl);
 
-    if (usedFakeLoadForTesting) {
-      // Break out of the infinite loop of waiting for our fake load
-      // to come down.
-      this->StopTimePassed = true;
-    } else {
-      // Wait between 1 and 5 seconds before trying again.
-      cmCTestScriptHandler::SleepInSeconds(cmSystemTools::RandomSeed() % 5 +
-                                           1);
+    // Wait between 1 and 5 seconds before trying again.
+    unsigned int milliseconds = (cmSystemTools::RandomSeed() % 5 + 1) * 1000;
+    if (this->FakeLoadForTesting) {
+      milliseconds = 10;
     }
+    if (this->TestLoadRetryTimer.get() == nullptr) {
+      this->TestLoadRetryTimer.init(this->Loop, this);
+    }
+    this->TestLoadRetryTimer.start(
+      &cmCTestMultiProcessHandler::OnTestLoadRetryCB, milliseconds, 0);
   }
+}
+
+void cmCTestMultiProcessHandler::OnTestLoadRetryCB(uv_timer_t* timer)
+{
+  auto self = static_cast<cmCTestMultiProcessHandler*>(timer->data);
+  self->StartNextTests();
 }
 
 void cmCTestMultiProcessHandler::FinishTestProcess(cmCTestRunTest* runner,
@@ -406,8 +436,11 @@ void cmCTestMultiProcessHandler::FinishTestProcess(cmCTestRunTest* runner,
   auto properties = runner->GetTestProperties();
 
   bool testResult = runner->EndTest(this->Completed, this->Total, started);
+  if (runner->TimedOutForStopTime()) {
+    this->SetStopTimePassed();
+  }
   if (started) {
-    if (runner->StartAgain()) {
+    if (!this->StopTimePassed && runner->StartAgain(this->Completed)) {
       this->Completed--; // remove the completed test because run again
       return;
     }
@@ -458,7 +491,7 @@ void cmCTestMultiProcessHandler::UpdateCostData()
       if (line == "---") {
         break;
       }
-      std::vector<cmsys::String> parts = cmSystemTools::SplitString(line, ' ');
+      std::vector<std::string> parts = cmSystemTools::SplitString(line, ' ');
       // Format: <name> <previous_runs> <avg_cost>
       if (parts.size() < 3) {
         break;
@@ -511,7 +544,7 @@ void cmCTestMultiProcessHandler::ReadCostData()
         break;
       }
 
-      std::vector<cmsys::String> parts = cmSystemTools::SplitString(line, ' ');
+      std::vector<std::string> parts = cmSystemTools::SplitString(line, ' ');
 
       // Probably an older version of the file, will be fixed next run
       if (parts.size() < 3) {
