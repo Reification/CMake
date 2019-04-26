@@ -6,6 +6,7 @@
 #include "cmGeneratorTarget.h"
 #include "cmGlobalGenerator.h"
 #include "cmInstallGenerator.h"
+#include "cmInstallSubdirectoryGenerator.h"
 #include "cmInstallTargetGenerator.h"
 #include "cmJsonObjectDictionary.h"
 #include "cmJsonObjects.h"
@@ -13,6 +14,7 @@
 #include "cmLocalGenerator.h"
 #include "cmMakefile.h"
 #include "cmProperty.h"
+#include "cmPropertyMap.h"
 #include "cmSourceFile.h"
 #include "cmState.h"
 #include "cmStateDirectory.h"
@@ -47,7 +49,7 @@ std::vector<std::string> getConfigurations(const cmake* cm)
 
   makefiles[0]->GetConfigurations(configurations);
   if (configurations.empty()) {
-    configurations.push_back("");
+    configurations.emplace_back();
   }
   return configurations;
 }
@@ -290,10 +292,10 @@ static Json::Value DumpSourceFilesList(
         lg->AppendIncludeDirectories(includes, evaluatedIncludes, *file);
 
         for (const auto& include : includes) {
-          fileData.IncludePathList.push_back(
-            std::make_pair(include,
-                           target->IsSystemIncludeDirectory(
-                             include, config, fileData.Language)));
+          fileData.IncludePathList.emplace_back(
+            include,
+            target->IsSystemIncludeDirectory(include, config,
+                                             fileData.Language));
         }
       }
 
@@ -321,7 +323,7 @@ static Json::Value DumpSourceFilesList(
       fileData.SetDefines(defines);
     }
 
-    fileData.IsGenerated = file->GetPropertyAsBool("GENERATED");
+    fileData.IsGenerated = file->GetIsGenerated();
     std::vector<std::string>& groupFileList = fileGroups[fileData];
     groupFileList.push_back(file->GetFullPath());
   }
@@ -450,10 +452,9 @@ static Json::Value DumpTarget(cmGeneratorTarget* target,
                               const std::string& config)
 {
   cmLocalGenerator* lg = target->GetLocalGenerator();
-  const cmState* state = lg->GetState();
 
   const cmStateEnums::TargetType type = target->GetType();
-  const std::string typeName = state->GetTargetTypeName(type);
+  const std::string typeName = cmState::GetTargetTypeName(type);
 
   Json::Value ttl = Json::arrayValue;
   ttl.append("EXECUTABLE");
@@ -577,10 +578,10 @@ static Json::Value DumpTarget(cmGeneratorTarget* target,
     lg->GetTargetDefines(target, config, lang, defines);
     ld.SetDefines(defines);
     std::vector<std::string> includePathList;
-    lg->GetIncludeDirectories(includePathList, target, lang, config, true);
+    lg->GetIncludeDirectories(includePathList, target, lang, config);
     for (std::string const& i : includePathList) {
-      ld.IncludePathList.push_back(
-        std::make_pair(i, target->IsSystemIncludeDirectory(i, config, lang)));
+      ld.IncludePathList.emplace_back(
+        i, target->IsSystemIncludeDirectory(i, config, lang));
     }
   }
 
@@ -641,8 +642,13 @@ static Json::Value DumpProjectList(const cmake* cm, std::string const& config)
     // associated generators.
     bool hasInstallRule = false;
     for (const auto generator : projectIt.second) {
-      hasInstallRule =
-        generator->GetMakefile()->GetInstallGenerators().empty() == false;
+      for (const auto installGen :
+           generator->GetMakefile()->GetInstallGenerators()) {
+        if (!dynamic_cast<cmInstallSubdirectoryGenerator*>(installGen)) {
+          hasInstallRule = true;
+          break;
+        }
+      }
 
       if (hasInstallRule) {
         break;
