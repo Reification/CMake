@@ -52,8 +52,6 @@ protected:
 
   bool InitializeAndroidWorkflow(cmMakefile* mf);
 
-  std::string GetInstalledAndroidWorkflow() const;
-
   std::string GetDefaultAndroidToolChain() const;
 
   // Used to verify that the Desktop toolset for the current generator is

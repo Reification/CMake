@@ -9,6 +9,8 @@
 #include "cmVSSetupHelper.h"
 #include "cmake.h"
 
+#include "cmsys/Glob.hxx"
+
 #if defined(_M_ARM64)
 #  define HOST_PLATFORM_NAME "ARM64"
 #  define HOST_TOOLS_ARCH ""
@@ -512,4 +514,202 @@ std::string cmGlobalVisualStudioVersionedGenerator::FindDevEnvCommand()
 
   devenv = "devenv.com";
   return devenv;
+}
+
+bool cmGlobalVisualStudioVersionedGenerator::SetGeneratorPlatform(
+  std::string const& p, cmMakefile* mf)
+{
+  if (this->IsAndroidMSVS()) {
+    if (p != "ARM64" && p != "ARM" && p != "x86_64" && p != "x86") {
+      std::string err;
+      err = std::string("Building for Android with '") + this->GetName() +
+        "' Platform '" + p + "' not supported. Only ARM, ARM64, x86, x86_64";
+      mf->IssueMessage(MessageType::FATAL_ERROR, err.c_str());
+      return false;
+    }
+  }
+
+  return cmGlobalVisualStudio14Generator::SetGeneratorPlatform(p, mf);
+}
+
+bool cmGlobalVisualStudioVersionedGenerator::SetGeneratorToolset(
+  std::string const& ts, cmMakefile* mf)
+{
+  if (this->IsAndroidMSVS() && ts.empty() &&
+      this->DefaultPlatformToolset.empty()) {
+    std::ostringstream e;
+    e << this->GetName()
+      << " MSVS Android requires CMAKE_GENERATOR_TOOLSET to be set.";
+    mf->IssueMessage(MessageType::FATAL_ERROR, e.str());
+    return false;
+  }
+
+  return cmGlobalVisualStudio14Generator::SetGeneratorToolset(ts, mf);
+}
+
+std::string cmGlobalVisualStudioVersionedGenerator::GetAndroidAPILevel() const
+{
+  return this->AndroidAPILevel;
+}
+
+bool cmGlobalVisualStudioVersionedGenerator::FindVCTargetsPath(cmMakefile* mf)
+{
+  static std::string s_targetsPath;
+
+  if (s_targetsPath.empty()) {
+    this->GetVSInstance(s_targetsPath);
+    s_targetsPath += "/Common7/IDE/VC/VCTargets";
+
+    if (!cmSystemTools::FileIsDirectory(s_targetsPath)) {
+      s_targetsPath = "#";
+    }
+  }
+
+  if (s_targetsPath[0] == '#') {
+    return false;
+  }
+
+  if (this->VCTargetsPath.empty()) {
+    this->VCTargetsPath = s_targetsPath;
+  }
+
+  return true;
+}
+
+bool cmGlobalVisualStudioVersionedGenerator::InitializeSystem(cmMakefile* mf)
+{
+  if (strcmp(this->SystemName.c_str(), "Android") != 0) {
+    this->SystemIsAndroidMSVS = false;
+    return cmGlobalVisualStudio14Generator::InitializeSystem(mf);
+  }
+
+  if (!InitializeAndroidWorkflow(mf)) {
+    if (!GetInstalledNsightTegraVersion().empty()) {
+      return cmGlobalVisualStudio14Generator::InitializeSystem(mf);
+    }
+
+    mf->IssueMessage(MessageType::FATAL_ERROR,
+                     std::string("CMAKE_SYSTEM_NAME is '") + this->SystemName +
+                       "' but "
+                       "'Visual C++ for Cross Platform Mobile Development "
+                       "(Android)' is not installed.");
+    return false;
+  }
+
+  if (this->DefaultPlatformName != "Win32") {
+    std::ostringstream e;
+    e << "CMAKE_SYSTEM_NAME is '" << this->SystemName
+      << "' but CMAKE_GENERATOR "
+      << "specifies a platform too: '" << this->GetName() << "'";
+    mf->IssueMessage(MessageType::FATAL_ERROR, e.str());
+    return false;
+  }
+
+  this->SystemIsAndroidMSVS = true;
+  this->DefaultPlatformToolset = GetDefaultAndroidToolChain();
+
+  // even though not targeting windows 10 sdk need a valid one for utility
+  // vcxproj files
+  this->SelectWindows10SDK(mf, false);
+
+  return true;
+}
+
+/// @TODO: These paths are correct for MSVS 2017 but not 2019! tool chains have moved!
+bool cmGlobalVisualStudioVersionedGenerator::InitializeAndroidWorkflow(cmMakefile* mf)
+{
+  if (!VersionAndroidMSVS.empty()) {
+    return true;
+  }
+
+  std::string vsInstance;
+  if (!this->GetVSInstance(vsInstance)) {
+    mf->IssueMessage(MessageType::FATAL_ERROR, "VisualStudio not installed!");
+    return false;
+  }
+
+  std::string testPath =
+    vsInstance + "/Common7/IDE/VC/VCTargets/Application Type/Android";
+
+  if (!cmSystemTools::FileIsDirectory(testPath)) {
+    return false;
+  }
+
+  std::string generatorPlatform =
+    mf->GetSafeDefinition("CMAKE_GENERATOR_PLATFORM");
+
+  if (generatorPlatform.empty()) {
+    mf->IssueMessage(MessageType::FATAL_ERROR, "CMAKE_GENERATOR_PLATFORM not set!");
+    return false;
+  }
+
+  std::string highestInstalledWorkflow;
+  std::string highestClangToolChain;
+
+  {
+    cmsys::Glob versionDirGlob;
+    versionDirGlob.SetListDirs(true);
+    versionDirGlob.FindFiles(testPath + "/[0-9]*.[0-9]*");
+
+    std::vector<std::string>& dirs = versionDirGlob.GetFiles();
+
+    for (size_t i = dirs.size(); i-- > 0;) {
+      const std::string& versionDir = dirs[i];
+
+      if (cmSystemTools::FileIsDirectory(versionDir)) {
+        highestInstalledWorkflow = versionDir;
+        break;
+      }
+    }
+  }
+
+  if (highestInstalledWorkflow.empty()) {
+    return false;
+  }
+
+  {
+    cmsys::Glob versionDirGlob;
+    versionDirGlob.SetListDirs(true);
+
+    versionDirGlob.FindFiles(highestInstalledWorkflow + "/Platforms/" +
+                             generatorPlatform + "/PlatformToolsets/Clang*");
+
+    std::vector<std::string>& dirs = versionDirGlob.GetFiles();
+
+    for (uint32_t i = dirs.size(); i-- > 0;) {
+      const std::string& versionDir = dirs[i];
+
+      if (cmSystemTools::FileIsDirectory(versionDir)) {
+        highestClangToolChain = versionDir;
+        break;
+      }
+    }
+  }
+
+  if (highestClangToolChain.empty()) {
+    mf->IssueMessage(
+      MessageType::FATAL_ERROR,
+      "Could not find any clang toolchains for MSVS/Android work flow!");
+    return false;
+  }
+
+  const char* versionDirName =
+    strrchr(highestInstalledWorkflow.c_str(), '/') + 1;
+  VersionAndroidMSVS = versionDirName;
+
+  const char* toolChainName = strrchr(highestClangToolChain.c_str(), '/') + 1;
+  DefaultAndroidToolChain = toolChainName;
+
+  AndroidAPILevel = mf->GetSafeDefinition("ANDROID_NATIVE_API_LEVEL");
+
+  if (AndroidAPILevel.empty()) {
+    AndroidAPILevel = "26";
+  }
+
+  return true;
+}
+
+std::string cmGlobalVisualStudioVersionedGenerator::GetDefaultAndroidToolChain() const
+{
+  return DefaultAndroidToolChain;
 }
